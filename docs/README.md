@@ -11,6 +11,14 @@ The Cillers Init system is designed to initialize and configure distributed syst
 
 ## Documentation Files
 
+### [Environment Configuration](environment-configuration.md)
+Complete guide to configuring environments including:
+- Environment validation and registry
+- env.yaml file format and structure
+- Environment naming conventions
+- Integration with other components
+- Multi-environment and multi-region setups
+
 ### [Redpanda Documentation](redpanda.md)
 Complete guide to configuring Redpanda topics including:
 - Topic creation and management
