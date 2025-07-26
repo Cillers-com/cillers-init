@@ -1,165 +1,170 @@
-# Cillers Init Docker Image
+# Cillers Init
 
-This directory contains the Docker configuration for the Cillers Init application, which handles initialization operations for Couchbase and Redpanda services.
+A distributed systems initialization tool developed and maintained by **Cillers AB**. This tool automates the setup and configuration of distributed infrastructure components across different environments.
 
-## Building the Docker Image
+## Overview
 
-To build the Docker image, run the following command from this directory:
+Cillers Init provides automated initialization and configuration management for:
 
-```bash
-docker build -t cillers-init:latest .
-```
+- **Redpanda**: High-performance streaming platform (Kafka-compatible)
+- **Couchbase**: Distributed NoSQL document database
 
-## Complete Workflow: Build and Upload to GCP
+The tool supports multiple environments with hierarchical configuration management, allowing you to maintain consistent baseline configurations while customizing settings for specific environments.
 
-Here's the complete step-by-step process:
+## Key Features
 
-1. **Build the image first** (required before tagging):
-   ```bash
-   docker build -t cillers-init:latest .
-   ```
+- **Multi-Environment Support**: Configure different settings for development, staging, production, and custom environments
+- **Hierarchical Configuration**: Global defaults → component defaults → environment-specific overrides
+- **Automated Resource Creation**: Automatically creates topics, buckets, scopes, and collections based on configuration
+- **Environment Validation**: Prevents deployments to undefined environments
+- **Retry Logic**: Built-in retry mechanisms for reliable initialization
+- **Docker Ready**: Containerized for easy deployment in any environment
 
-2. **Tag for GCP** (replace YOUR_PROJECT_ID with your actual project ID):
-   ```bash
-   docker tag cillers-init:latest us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cillers-repo/cillers-init:latest
-   ```
+## Quick Start
 
-3. **Push to GCP**:
-   ```bash
-   docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cillers-repo/cillers-init:latest
-   ```
-
-## Uploading to Google Cloud Platform
-
-### Prerequisites
-
-1. Install and configure the Google Cloud CLI:
-   ```bash
-   # Install gcloud CLI (if not already installed)
-   # Follow instructions at: https://cloud.google.com/sdk/docs/install
-   
-   # Authenticate with your GCP account
-   gcloud auth login
-   
-   # Set your project ID
-   gcloud config set project YOUR_PROJECT_ID
-   ```
-
-2. Configure Docker to use gcloud as a credential helper:
-   ```bash
-   gcloud auth configure-docker
-   ```
-
-### Artifact Registry
-
-First, create an Artifact Registry repository (if not already created):
+### Using Docker
 
 ```bash
-# Create repository (one-time setup)
-gcloud artifacts repositories create cillers-repo \
-    --repository-format=docker \
-    --location=us-central1 \
-    --description="Cillers Docker images"
+# Pull the latest image
+docker pull cillers/init:latest
 
-# Configure Docker for Artifact Registry
-gcloud auth configure-docker us-central1-docker.pkg.dev
-```
-
-Then build, tag, and push:
-
-```bash
-# Tag the image for Artifact Registry
-docker tag cillers-init:latest us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cillers-repo/cillers-init:latest
-
-# Push to Artifact Registry
-docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cillers-repo/cillers-init:latest
-```
-
-### Making the Image Public
-
-To allow others to pull the image without authentication:
-
-**For GCR:**
-```bash
-gsutil iam ch allUsers:objectViewer gs://artifacts.YOUR_PROJECT_ID.appspot.com
-```
-
-**For Artifact Registry:**
-```bash
-gcloud artifacts repositories add-iam-policy-binding cillers-repo \
-    --location=us-central1 \
-    --member=allUsers \
-    --role=roles/artifactregistry.reader
-```
-
-### Using the Published Image
-
-Others can then use your published image:
-
-**From GCR:**
-```bash
-docker pull gcr.io/YOUR_PROJECT_ID/cillers-init:latest
-```
-
-**From Artifact Registry:**
-```bash
-docker pull us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cillers-repo/cillers-init:latest
-```
-
-## Running the Container
-
-### Using Docker Run
-
-```bash
+# Run with your configuration
 docker run --rm \
   -e ENVIRONMENT=development \
   -e INIT_SERVICES=couchbase,redpanda \
-  -v $(pwd)/../../conf/init:/conf/init:ro \
-  cillers-init:latest
+  -v /path/to/your/config:/conf/init:ro \
+  cillers/init:latest
 ```
 
 ### Using Docker Compose
 
-```bash
-# Set environment variables (optional, defaults are provided)
-export ENVIRONMENT=development
-export INIT_SERVICES=couchbase,redpanda
+Create a `docker-compose.yml` file:
 
-# Run with docker-compose
-docker-compose up --build
+```yaml
+version: '3.8'
+services:
+  cillers-init:
+    image: cillers/init:latest
+    environment:
+      - ENVIRONMENT=development
+      - INIT_SERVICES=couchbase,redpanda
+    volumes:
+      - ./conf:/conf/init:ro
+    depends_on:
+      - couchbase
+      - redpanda
+```
+
+Then run:
+
+```bash
+docker-compose up cillers-init
+```
+
+## Configuration
+
+The tool requires a configuration directory mounted at `/conf/init` containing:
+
+- **`env.yaml`**: Environment definitions and validation
+- **`couchbase.yaml`**: Couchbase bucket, scope, and collection configurations
+- **`redpanda.yaml`**: Redpanda topic configurations
+
+### Example Configuration Structure
+
+```
+conf/init/
+├── env.yaml           # Environment registry
+├── couchbase.yaml     # Couchbase configuration
+└── redpanda.yaml      # Redpanda configuration
 ```
 
 ## Environment Variables
 
-- `ENVIRONMENT` (required): The environment to run in (must be defined in `/conf/init/env.yaml`)
-- `INIT_SERVICES` (optional): Comma-separated list of services to initialize (default: `couchbase,redpanda`)
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `ENVIRONMENT` | Target environment (must exist in env.yaml) | - | Yes |
+| `INIT_SERVICES` | Comma-separated services to initialize | `couchbase,redpanda` | No |
+| `COUCHBASE_HOST` | Couchbase server hostname | `couchbase` | No |
+| `COUCHBASE_USERNAME` | Couchbase admin username | `admin` | No |
+| `COUCHBASE_PASSWORD` | Couchbase admin password | `password` | No |
+| `REDPANDA_HOST` | Redpanda broker hostname | `redpanda` | No |
+| `REDPANDA_PORT` | Redpanda broker port | `9092` | No |
 
-## Volume Mounts
+## Documentation
 
-The container expects the configuration directory to be mounted at `/conf/init`. This should contain:
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
-- `env.yaml`: Environment configuration
-- `couchbase.yaml`: Couchbase configuration
-- `redpanda.yaml`: Redpanda configuration
+- **[Environment Configuration](docs/environment-configuration.md)**: Complete guide to env.yaml configuration
+- **[Redpanda Documentation](docs/redpanda.md)**: Topic configuration and management
+- **[Couchbase Documentation](docs/couchbase.md)**: Bucket, scope, and collection management
 
-## Application Structure
+## Use Cases
 
-- `src/main.py`: Main entry point
-- `src/config.py`: Configuration management
-- `src/controllers/`: Service-specific controllers
-- `bin/run`: Application startup script
-- `requirements.txt`: Python dependencies
+### Development Environment Setup
+Quickly initialize development environments with minimal resource allocation:
+```bash
+docker run --rm \
+  -e ENVIRONMENT=development \
+  -v ./conf:/conf/init:ro \
+  cillers/init:latest
+```
 
-## Dependencies
+### Production Deployment
+Initialize production environments with high-availability configurations:
+```bash
+docker run --rm \
+  -e ENVIRONMENT=production \
+  -v ./conf:/conf/init:ro \
+  cillers/init:latest
+```
 
-The application requires:
-- PyYAML==6.0.1
-- couchbase==4.3.2
-- kafka-python
+### CI/CD Integration
+Integrate into your deployment pipeline:
+```yaml
+# Kubernetes Job example
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cillers-init
+spec:
+  template:
+    spec:
+      containers:
+      - name: init
+        image: cillers/init:latest
+        env:
+        - name: ENVIRONMENT
+          value: "staging"
+        volumeMounts:
+        - name: config
+          mountPath: /conf/init
+      restartPolicy: OnFailure
+```
 
-## Notes
+## How It Works
 
-- The container runs as root by default
-- Configuration files are mounted read-only
-- The application will exit after completing all operations
-- Use `restart: unless-stopped` in docker-compose for automatic restarts
+1. **Environment Validation**: Validates the specified environment against env.yaml
+2. **Configuration Loading**: Loads component-specific configuration files
+3. **Resource Creation**: Creates missing resources (topics, buckets, etc.)
+4. **Settings Application**: Applies environment-specific settings
+5. **Verification**: Verifies successful resource creation
+
+## Best Practices
+
+- **Start Simple**: Begin with basic configurations and add complexity as needed
+- **Environment Separation**: Use different configurations for each environment
+- **Version Control**: Keep configuration files in version control
+- **Testing**: Test configurations in development before production deployment
+- **Monitoring**: Monitor resource usage and adjust quotas accordingly
+
+## Support
+
+For issues, questions, or contributions, please contact Cillers AB or refer to the comprehensive documentation in the `docs/` directory.
+
+## License
+
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+---
+
+**Developed and maintained by Cillers AB**
