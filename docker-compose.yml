@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  init:
+    # Option 1: Build locally
+    build: .
+    image: cillers-init:latest
+    
+    # Option 2: Use published GCP image (uncomment and replace YOUR_PROJECT_ID)
+    # image: gcr.io/YOUR_PROJECT_ID/cillers-init:latest
+    # OR
+    # image: us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cillers-repo/cillers-init:latest
+    
+    container_name: cillers-init
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - INIT_SERVICES=${INIT_SERVICES:-couchbase,redpanda}
+    volumes:
+      # Mount configuration directory
+      - ../../conf/init:/conf/init:ro
+    restart: unless-stopped
+    # Uncomment if the app needs to connect to other services
+    # networks:
+    #   - cillers-network
+
+# Uncomment if you need a shared network
+# networks:
+#   cillers-network:
+#     external: true
